@@ -22,15 +22,15 @@ with open("README.md", encoding="utf-8") as f:
     readme = f.read()
 
 setup(
-    name="TgCrypto",
+    name="TgCrypto-pyrofork",
     version="1.2.5",
-    description="Fast and Portable Cryptography Extension Library for Pyrogram",
+    description="Fast and Portable Cryptography Extension Library for Pyrofork",
     long_description=readme,
     long_description_content_type="text/markdown",
-    url="https://github.com/pyrogram",
-    download_url="https://github.com/pyrogram/tgcrypto/releases/latest",
-    author="Dan",
-    author_email="dan@pyrogram.org",
+    url="https://github.com/Mayuri-Chan",
+    download_url="https://github.com/Mayuri-Chan/tgcrypto/releases/latest",
+    author="wulan17",
+    author_email="mayuri@mayuri.my.id",
     license="LGPLv3+",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -56,12 +56,12 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"
     ],
-    keywords="pyrogram telegram crypto cryptography encryption mtproto extension library aes",
+    keywords="pyrogram pyrofork telegram crypto cryptography encryption mtproto extension library aes",
     project_urls={
-        "Tracker": "https://github.com/pyrogram/tgcrypto/issues",
-        "Community": "https://t.me/pyrogram",
-        "Source": "https://github.com/pyrogram/tgcrypto",
-        "Documentation": "https://docs.pyrogram.org",
+        "Tracker": "https://github.com/Mayuri-Chan/tgcrypto/issues",
+        "Community": "https://t.me/MayuriChan_Chat",
+        "Source": "https://github.com/Mayuri-Chan/tgcrypto",
+        "Documentation": "https://pyrofork.mayuri.my.id",
     },
     python_requires="~=3.7",
     packages=find_packages(),
