@@ -54,7 +54,7 @@ setup(
         "Topic :: Communications",
         "Topic :: Communications :: Chat",
         "Topic :: Software Development :: Libraries",
-        "Topic :: Software Development :: Libraries :: Python Modules"
+        "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     keywords="pyrogram pyroblack telegram crypto cryptography encryption mtproto extension library aes",
     project_urls={
@@ -75,8 +75,8 @@ setup(
                 "tgcrypto/aes256.c",
                 "tgcrypto/ige256.c",
                 "tgcrypto/ctr256.c",
-                "tgcrypto/cbc256.c"
-            ]
+                "tgcrypto/cbc256.c",
+            ],
         )
-    ]
+    ],
 )
