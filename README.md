@@ -1,9 +1,9 @@
 # TgCrypto
 
-> Fast and Portable Cryptography Extension Library for Pyrofork
+> Fast and Portable Cryptography Extension Library for pyroblack
 
 **TgCrypto** is a Cryptography Library written in C as a Python extension. It is designed to be portable, fast,
-easy to install and use. TgCrypto is intended for [Pyrofork](https://github.com/Mayuri-Chan/pyrofork) and implements the
+easy to install and use. TgCrypto is intended for [pyroblack](https://github.com/eyMarv/pyroblack) and implements the
 cryptographic algorithms Telegram requires, namely:
 
 - **`AES-256-IGE`** - used in [MTProto v2.0](https://core.telegram.org/mtproto).
@@ -12,12 +12,12 @@ cryptographic algorithms Telegram requires, namely:
 
 ## Requirements
 
-- Python 3.7 or higher.
+- Python 3.8 or higher.
 
 ## Installation
 
 ``` bash
-$ pip3 install -U tgcrypto
+$ pip3 install -U tgcrypto-pyroblack
 ```
 
 ## API
@@ -150,12 +150,12 @@ print(data == cbc_decrypted)  # True
 
 ## Testing
 
-1. Clone this repository: `git clone https://github.com/pyrogram/tgcrypto`.
-2. Enter the directory: `cd tgcrypto`.
+1. Clone this repository: `git clone https://github.com/eyMarv/tgcrypto-pyroblack`.
+2. Enter the directory: `cd tgcrypto-pyroblack`.
 3. Install `tox`: `pip3 install tox`
 4. Run tests: `tox`.
 
 ## License
 
 [LGPLv3+](COPYING.lesser) © 2017-present [Dan](https://github.com/delivrance)  
-[LGPLv3+](COPYING.lesser) © 2024-present [Mayuri-Chan](https://github.com/Mayuri-Chan)
+[LGPLv3+](COPYING.lesser) © 2024-present [eyMarv](https://github.com/eyMarv)

@@ -22,15 +22,15 @@ with open("README.md", encoding="utf-8") as f:
     readme = f.read()
 
 setup(
-    name="TgCrypto-pyrofork",
+    name="TgCrypto-pyroblack",
     version="1.2.6",
-    description="Fast and Portable Cryptography Extension Library for Pyrofork",
+    description="Fast and Portable Cryptography Extension Library for pyroblack",
     long_description=readme,
     long_description_content_type="text/markdown",
-    url="https://github.com/Mayuri-Chan",
-    download_url="https://github.com/Mayuri-Chan/tgcrypto/releases/latest",
-    author="wulan17",
-    author_email="mayuri@mayuri.my.id",
+    url="https://github.com/eyMarv",
+    download_url="https://github.com/eyMarv/tgcrypto-pyroblack/releases/latest",
+    author="eyMarv",
+    author_email="eyMarv07@gmail.com",
     license="LGPLv3+",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -56,12 +56,12 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"
     ],
-    keywords="pyrogram pyrofork telegram crypto cryptography encryption mtproto extension library aes",
+    keywords="pyrogram pyroblack telegram crypto cryptography encryption mtproto extension library aes",
     project_urls={
-        "Tracker": "https://github.com/Mayuri-Chan/tgcrypto/issues",
-        "Community": "https://t.me/MayuriChan_Chat",
-        "Source": "https://github.com/Mayuri-Chan/tgcrypto",
-        "Documentation": "https://pyrofork.mayuri.my.id",
+        "Tracker": "https://github.com/eyMarv/tgcrypto-pyroblack/issues",
+        "Community": "https://t.me/OpenFileZ",
+        "Source": "https://github.com/eyMarv/tgcrypto-pyroblack",
+        "Documentation": "https://eyMarv.github.io/pyroblack-docs",
     },
     python_requires="~=3.8",
     packages=find_packages(),
