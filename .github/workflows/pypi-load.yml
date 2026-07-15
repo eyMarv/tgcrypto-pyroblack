@@ -18,6 +18,14 @@ jobs:
     strategy:
       matrix:
         os:
+          - name: "ubuntu-26.04"
+            platform: "linux"
+            platform_id: "manylinux_x86_64"
+
+          - name: "ubuntu-26.04-arm"
+            platform: "linux"
+            platform_id: "manylinux_aarch64"
+
           - name: "ubuntu-24.04"
             platform: "linux"
             platform_id: "manylinux_x86_64"
