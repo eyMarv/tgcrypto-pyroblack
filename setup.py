@@ -23,7 +23,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="TgCrypto-pyroblack",
-    version="1.2.6",
+    version="1.2.12",
     description="Fast and Portable Cryptography Extension Library for pyroblack",
     long_description=readme,
     long_description_content_type="text/markdown",
@@ -45,6 +45,8 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Programming Language :: Python :: Implementation",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
@@ -64,8 +66,7 @@ setup(
         "Documentation": "https://eyMarv.github.io/pyroblack-docs",
     },
     python_requires="~=3.8",
-    packages=find_packages(),
-    test_suite="tests",
+    packages=find_packages(exclude=["tests*"]),
     zip_safe=False,
     ext_modules=[
         Extension(

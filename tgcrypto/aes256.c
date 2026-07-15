@@ -20,6 +20,58 @@
 
 #include "aes256.h"
 
+/*
+ * Hardware AES (AES-NI) acceleration with a portable software fallback.
+ *
+ * The four public aes256_* functions dispatch at runtime: when the host CPU
+ * advertises the AES-NI instruction set they use the hardware path (~30x
+ * faster), otherwise they fall back to the constant-time-agnostic T-table
+ * implementation kept below. The expandedKey[60] buffer (240 bytes) is opaque
+ * to callers and holds either the 60 T-table round-key words or the 15
+ * 128-bit AES-NI round keys, so ige256/ctr256/cbc256 need no changes.
+ */
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#define TGCRYPTO_X86 1
+
+#include <wmmintrin.h>  /* AES-NI */
+#include <emmintrin.h>  /* SSE2   */
+
+#if defined(_MSC_VER)
+#include <intrin.h>
+#define AESNI_TARGET
+#else
+#include <cpuid.h>
+/* Let GCC/Clang emit AES-NI in these functions without a global -maes flag,
+ * so the software fallback stays usable on CPUs that lack the extension. */
+#define AESNI_TARGET __attribute__((target("aes,sse4.1")))
+#endif
+
+/* Cached CPUID probe. The result is deterministic, so the lazy-init race is
+ * benign: concurrent callers just recompute the same value. */
+static int aesni_available = -1;
+
+static int has_aesni(void) {
+    if (aesni_available != -1)
+        return aesni_available;
+
+#if defined(_MSC_VER)
+    int regs[4];
+    __cpuid(regs, 1);
+    aesni_available = (regs[2] & (1 << 25)) != 0;
+#else
+    unsigned int eax, ebx, ecx, edx;
+    if (__get_cpuid(1, &eax, &ebx, &ecx, &edx))
+        aesni_available = (ecx & (1 << 25)) != 0;
+    else
+        aesni_available = 0;
+#endif
+
+    return aesni_available;
+}
+#else
+static int has_aesni(void) { return 0; }
+#endif
+
 #define LROTL(x) (((x) << 8) | ((x) >> 24))
 #define LROTR(x) (((x) >> 8) | ((x) << 24))
 #define SWAP(x) ((LROTL((x)) & 0x00ff00ff) | (LROTR((x)) & 0xff00ff00))
@@ -358,7 +410,7 @@ uint32_t sub_word(uint32_t word) {
     );
 }
 
-void aes256_set_encryption_key(const uint8_t key[32], uint32_t expandedKey[60]) {
+static void aes256_set_encryption_key_sw(const uint8_t key[32], uint32_t expandedKey[60]) {
     uint32_t Nb = 4, Nr = 14, Nk = 8, i, tmp;
 
     for (i = 0; i < Nk; ++i)
@@ -381,10 +433,10 @@ void aes256_set_encryption_key(const uint8_t key[32], uint32_t expandedKey[60]) 
     }
 }
 
-void aes256_set_decryption_key(const uint8_t key[32], uint32_t expandedKey[60]) {
+static void aes256_set_decryption_key_sw(const uint8_t key[32], uint32_t expandedKey[60]) {
     uint32_t i, j, k, tmp;
 
-    aes256_set_encryption_key(key, expandedKey);
+    aes256_set_encryption_key_sw(key, expandedKey);
 
     for (i = 0, j = 56; i < j; i += 4, j -= 4)
         for (k = 0; k < 4; ++k) {
@@ -403,7 +455,7 @@ void aes256_set_decryption_key(const uint8_t key[32], uint32_t expandedKey[60]) 
             );
 }
 
-void aes256_encrypt(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
+static void aes256_encrypt_sw(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
     uint32_t s0, s1, s2, s3, t0, t1, t2, t3;
 
     s0 = GET(in) ^ key[0];
@@ -517,7 +569,7 @@ void aes256_encrypt(const uint8_t in[16], uint8_t out[16], const uint32_t key[60
     PUT(out + 12, s3);
 }
 
-void aes256_decrypt(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
+static void aes256_decrypt_sw(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
     uint32_t s0, s1, s2, s3, t0, t1, t2, t3;
 
     s0 = GET(in) ^ key[0];
@@ -629,4 +681,169 @@ void aes256_decrypt(const uint8_t in[16], uint8_t out[16], const uint32_t key[60
     );
 
     PUT(out + 12, s3);
+}
+
+#ifdef TGCRYPTO_X86
+/*
+ * AES-NI hardware path. Round keys are stored into the caller's opaque
+ * uint32_t[60] buffer as 15 consecutive 128-bit words. The buffer is only
+ * 4-byte aligned, so all vector loads/stores against it are unaligned.
+ * Key-expansion follows the Intel AES-NI whitepaper (Gueron) schedule.
+ */
+
+AESNI_TARGET
+static inline __m128i aesni_key_assist_1(__m128i temp1, __m128i temp2) {
+    __m128i temp4;
+    temp2 = _mm_shuffle_epi32(temp2, 0xff);
+    temp4 = _mm_slli_si128(temp1, 0x4);
+    temp1 = _mm_xor_si128(temp1, temp4);
+    temp4 = _mm_slli_si128(temp4, 0x4);
+    temp1 = _mm_xor_si128(temp1, temp4);
+    temp4 = _mm_slli_si128(temp4, 0x4);
+    temp1 = _mm_xor_si128(temp1, temp4);
+    return _mm_xor_si128(temp1, temp2);
+}
+
+AESNI_TARGET
+static inline __m128i aesni_key_assist_2(__m128i temp1, __m128i temp3) {
+    __m128i temp2, temp4;
+    temp4 = _mm_aeskeygenassist_si128(temp1, 0x0);
+    temp2 = _mm_shuffle_epi32(temp4, 0xaa);
+    temp4 = _mm_slli_si128(temp3, 0x4);
+    temp3 = _mm_xor_si128(temp3, temp4);
+    temp4 = _mm_slli_si128(temp4, 0x4);
+    temp3 = _mm_xor_si128(temp3, temp4);
+    temp4 = _mm_slli_si128(temp4, 0x4);
+    temp3 = _mm_xor_si128(temp3, temp4);
+    return _mm_xor_si128(temp3, temp2);
+}
+
+AESNI_TARGET
+static void aes256_set_encryption_key_ni(const uint8_t key[32], uint32_t expandedKey[60]) {
+    uint8_t *ks = (uint8_t *) expandedKey;
+    __m128i t1 = _mm_loadu_si128((const __m128i *) key);
+    __m128i t3 = _mm_loadu_si128((const __m128i *) (key + 16));
+    __m128i t2;
+
+    _mm_storeu_si128((__m128i *) (ks + 0 * 16), t1);
+    _mm_storeu_si128((__m128i *) (ks + 1 * 16), t3);
+
+#define AESNI_KE_ROUND(rcon, i_even, i_odd)                                   \
+    t2 = _mm_aeskeygenassist_si128(t3, rcon);                                 \
+    t1 = aesni_key_assist_1(t1, t2);                                          \
+    _mm_storeu_si128((__m128i *) (ks + (i_even) * 16), t1);                   \
+    if ((i_odd) <= 13) {                                                      \
+        t3 = aesni_key_assist_2(t1, t3);                                      \
+        _mm_storeu_si128((__m128i *) (ks + (i_odd) * 16), t3);                \
+    }
+
+    AESNI_KE_ROUND(0x01, 2, 3);
+    AESNI_KE_ROUND(0x02, 4, 5);
+    AESNI_KE_ROUND(0x04, 6, 7);
+    AESNI_KE_ROUND(0x08, 8, 9);
+    AESNI_KE_ROUND(0x10, 10, 11);
+    AESNI_KE_ROUND(0x20, 12, 13);
+    AESNI_KE_ROUND(0x40, 14, 15);
+
+#undef AESNI_KE_ROUND
+}
+
+AESNI_TARGET
+static void aes256_set_decryption_key_ni(const uint8_t key[32], uint32_t expandedKey[60]) {
+    uint32_t enc[60];
+    uint8_t *enc_b = (uint8_t *) enc;
+    uint8_t *dec_b = (uint8_t *) expandedKey;
+    int i;
+
+    aes256_set_encryption_key_ni(key, enc);
+
+    /* Reverse round-key order and apply InvMixColumns to the inner rounds so
+     * the schedule feeds _mm_aesdec_si128 directly. */
+    _mm_storeu_si128((__m128i *) (dec_b + 0 * 16),
+                     _mm_loadu_si128((const __m128i *) (enc_b + 14 * 16)));
+
+    for (i = 1; i < 14; ++i)
+        _mm_storeu_si128((__m128i *) (dec_b + i * 16),
+                         _mm_aesimc_si128(_mm_loadu_si128((const __m128i *) (enc_b + (14 - i) * 16))));
+
+    _mm_storeu_si128((__m128i *) (dec_b + 14 * 16),
+                     _mm_loadu_si128((const __m128i *) (enc_b + 0 * 16)));
+}
+
+AESNI_TARGET
+static void aes256_encrypt_ni(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
+    const uint8_t *ks = (const uint8_t *) key;
+    __m128i m = _mm_loadu_si128((const __m128i *) in);
+    int i;
+
+    m = _mm_xor_si128(m, _mm_loadu_si128((const __m128i *) (ks + 0 * 16)));
+
+    for (i = 1; i < 14; ++i)
+        m = _mm_aesenc_si128(m, _mm_loadu_si128((const __m128i *) (ks + i * 16)));
+
+    m = _mm_aesenclast_si128(m, _mm_loadu_si128((const __m128i *) (ks + 14 * 16)));
+    _mm_storeu_si128((__m128i *) out, m);
+}
+
+AESNI_TARGET
+static void aes256_decrypt_ni(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
+    const uint8_t *ks = (const uint8_t *) key;
+    __m128i m = _mm_loadu_si128((const __m128i *) in);
+    int i;
+
+    m = _mm_xor_si128(m, _mm_loadu_si128((const __m128i *) (ks + 0 * 16)));
+
+    for (i = 1; i < 14; ++i)
+        m = _mm_aesdec_si128(m, _mm_loadu_si128((const __m128i *) (ks + i * 16)));
+
+    m = _mm_aesdeclast_si128(m, _mm_loadu_si128((const __m128i *) (ks + 14 * 16)));
+    _mm_storeu_si128((__m128i *) out, m);
+}
+#endif  /* TGCRYPTO_X86 */
+
+/*
+ * Public entry points. Each dispatches once per call to the hardware or
+ * software implementation. has_aesni() is cached and deterministic, so the
+ * key-setup and block functions always agree on which schedule format lives
+ * in the expandedKey buffer.
+ */
+
+void aes256_set_encryption_key(const uint8_t key[32], uint32_t expandedKey[60]) {
+#ifdef TGCRYPTO_X86
+    if (has_aesni()) {
+        aes256_set_encryption_key_ni(key, expandedKey);
+        return;
+    }
+#endif
+    aes256_set_encryption_key_sw(key, expandedKey);
+}
+
+void aes256_set_decryption_key(const uint8_t key[32], uint32_t expandedKey[60]) {
+#ifdef TGCRYPTO_X86
+    if (has_aesni()) {
+        aes256_set_decryption_key_ni(key, expandedKey);
+        return;
+    }
+#endif
+    aes256_set_decryption_key_sw(key, expandedKey);
+}
+
+void aes256_encrypt(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
+#ifdef TGCRYPTO_X86
+    if (has_aesni()) {
+        aes256_encrypt_ni(in, out, key);
+        return;
+    }
+#endif
+    aes256_encrypt_sw(in, out, key);
+}
+
+void aes256_decrypt(const uint8_t in[16], uint8_t out[16], const uint32_t key[60]) {
+#ifdef TGCRYPTO_X86
+    if (has_aesni()) {
+        aes256_decrypt_ni(in, out, key);
+        return;
+    }
+#endif
+    aes256_decrypt_sw(in, out, key);
 }
