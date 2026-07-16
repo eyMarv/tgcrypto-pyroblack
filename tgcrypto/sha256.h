@@ -22,9 +22,26 @@
  * along with Pyroblack.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CBC256_H
-#define CBC256_H
+#include <stdint.h>
+#include <stddef.h>
 
-uint8_t *cbc256(const uint8_t in[], uint32_t length, const uint8_t key[32], uint8_t iv[16], uint8_t encrypt);
+#ifndef SHA256_H
+#define SHA256_H
 
-#endif  // CBC256_H
+#define SHA256_DIGEST_SIZE 32
+#define SHA256_BLOCK_SIZE 64
+
+typedef struct {
+    uint32_t state[8];
+    uint64_t bitlen;
+    uint8_t buffer[SHA256_BLOCK_SIZE];
+    size_t buflen;
+} SHA256_CTX;
+
+void sha256_init(SHA256_CTX *ctx);
+
+void sha256_update(SHA256_CTX *ctx, const uint8_t *data, size_t len);
+
+void sha256_final(SHA256_CTX *ctx, uint8_t out[SHA256_DIGEST_SIZE]);
+
+#endif  // SHA256_H
