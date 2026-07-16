@@ -1,3 +1,8 @@
 [build-system]
-requires = ["setuptools<=69.5.1", "wheel<=0.43.0"]
+# setuptools >= 77 emits PEP 639 metadata (Metadata-Version 2.4), which is the
+# version that legitimizes the `License-File` headers this project ships. Older
+# setuptools (e.g. the 69.5.1 upstream pinned) writes Metadata-Version 2.1 *with*
+# License-File lines, a combination PyPI's Warehouse rejects with a 400 Bad
+# Request at upload time (twine check does not catch it). Keep the floor here.
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
